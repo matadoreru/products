@@ -2,6 +2,8 @@ package com.mango.products.infrastructure.web;
 
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Objects;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -36,7 +38,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler{
 
 			Map<String, String> errors = new LinkedHashMap<>();
 
-			ex.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
+			ex.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), Objects.requireNonNullElse(error.getDefaultMessage(), "invalid value")));
 			problem.setProperty("errors", errors);
 
 			return ResponseEntity.badRequest().body(problem);
