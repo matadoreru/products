@@ -16,10 +16,6 @@ spring:
     virtual:
       enabled: true
 
-  mvc:
-    problemdetails:
-      enabled: true
-
   management:
   endpoints:
     web:
