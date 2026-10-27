@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: products
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/products}
+    username: ${DB_USER:products}
+    password: ${DB_PASSWORD:products}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+  threads:
+    virtual:
+      enabled: true
+
+  mvc:
+    problemdetails:
+      enabled: true
+
+  management:
+  endpoints:
+    web:
+      exposure:
+        include: health
