@@ -289,4 +289,50 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
         addPrice(id, "199.99", "2025-01-01", null);
         return id;
     }
+
+    @Test
+    void historyCanBeFilteredByDateRange() throws Exception {
+        long id = createProductWithThreePrices();
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id)
+            .param("from", "2024-06-01").param("to", "2024-08-31"))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.prices[*].value").asArray()
+            .containsExactly(99.99, 129.99);
+    }
+
+    @Test
+    void historyCanBeFilteredWithOnlyOneBound() throws Exception {
+        long id = createProductWithThreePrices();
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("from", "2025-02-01"))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.prices[*].value").asArray()
+            .containsExactly(199.99);
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("to", "2024-03-01"))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.prices[*].value").asArray()
+            .containsExactly(99.99);
+    }
+
+    @Test
+    void filterCombinesWithPagination() throws Exception {
+        long id = createProductWithThreePrices();
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id)
+            .param("from", "2024-07-01").param("size", "1"))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.page.totalElements").isEqualTo(2);
+    }
+
+    @Test
+    void filterWithFromAfterToReturns400() throws Exception {
+        long id = createProductWithThreePrices();
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id)
+            .param("from", "2025-01-01").param("to", "2024-01-01"))
+            .hasStatus(HttpStatus.BAD_REQUEST)
+            .bodyJson().extractingPath("$.title").isEqualTo("Invalid filter");
+    }
 }

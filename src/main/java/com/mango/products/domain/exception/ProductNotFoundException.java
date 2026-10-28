@@ -1,4 +1,4 @@
-package com.mango.products.domain;
+package com.mango.products.domain.exception;
 
 public class ProductNotFoundException extends RuntimeException {
 

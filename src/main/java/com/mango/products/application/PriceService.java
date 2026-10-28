@@ -1,21 +1,24 @@
 package com.mango.products.application;
 
-import com.mango.products.domain.Price;
-import com.mango.products.domain.PriceNotFoundException;
-import com.mango.products.domain.PriceOverlapException;
-import com.mango.products.domain.Product;
+import com.mango.products.domain.exception.PriceNotFoundException;
+import com.mango.products.domain.exception.PriceOverlapException;
+import com.mango.products.domain.model.Price;
+import com.mango.products.domain.model.Product;
 import com.mango.products.infrastructure.persistence.PriceRepository;
+import com.mango.products.infrastructure.persistence.PriceSpecifications;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -60,21 +63,32 @@ public class PriceService {
     }
 
     @Transactional(readOnly = true)
-    public ProductPriceHistory getHistory(Long productId, @Nullable Integer page,
-                                          @Nullable Integer size, Sort.Direction direction) {
+    public ProductPriceHistory getHistory(Long productId, PriceHistoryQuery query) {
         Product product = productService.get(productId);
-        Sort sort = Sort.by(direction, "initDate");
+        Specification<Price> filter = buildFilter(productId, query);
+        Sort sort = Sort.by(query.direction(), "initDate");
 
-        if (page == null && size == null) {
-            List<Price> prices = priceRepository.findByProductId(productId, sort);
-            return new ProductPriceHistory(product, prices, null);
+        if (!query.isPaginated()) {
+            return new ProductPriceHistory(product, priceRepository.findAll(filter, sort), null);
         }
 
         Pageable pageable = PageRequest.of(
-            page == null ? 0 : page,
-            size == null ? DEFAULT_PAGE_SIZE : size,
+            query.page() == null ? 0 : query.page(),
+            query.size() == null ? DEFAULT_PAGE_SIZE : query.size(),
             sort);
-        Page<Price> result = priceRepository.findByProductId(productId, pageable);
+        Page<Price> result = priceRepository.findAll(filter, pageable);
         return new ProductPriceHistory(product, result.getContent(), PageInfo.from(result));
+    }
+
+    private static Specification<Price> buildFilter(Long productId, PriceHistoryQuery query) {
+        List<Specification<Price>> conditions = new ArrayList<>();
+        conditions.add(PriceSpecifications.ofProduct(productId));
+        if (query.from() != null) {
+            conditions.add(PriceSpecifications.activeOnOrAfter(query.from()));
+        }
+        if (query.to() != null) {
+            conditions.add(PriceSpecifications.activeOnOrBefore(query.to()));
+        }
+        return Specification.allOf(conditions);
     }
 }

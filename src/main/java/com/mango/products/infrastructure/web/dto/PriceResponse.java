@@ -1,6 +1,6 @@
 package com.mango.products.infrastructure.web.dto;
 
-import com.mango.products.domain.Price;
+import com.mango.products.domain.model.Price;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;

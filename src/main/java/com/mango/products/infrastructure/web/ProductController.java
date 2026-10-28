@@ -1,7 +1,7 @@
 package com.mango.products.infrastructure.web;
 
 import com.mango.products.application.ProductService;
-import com.mango.products.domain.Product;
+import com.mango.products.domain.model.Product;
 import com.mango.products.infrastructure.web.dto.CreateProductRequest;
 import com.mango.products.infrastructure.web.dto.ProductResponse;
 import io.swagger.v3.oas.annotations.Operation;

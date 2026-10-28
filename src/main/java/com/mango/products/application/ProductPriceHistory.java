@@ -1,7 +1,7 @@
 package com.mango.products.application;
 
-import com.mango.products.domain.Price;
-import com.mango.products.domain.Product;
+import com.mango.products.domain.model.Price;
+import com.mango.products.domain.model.Product;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;

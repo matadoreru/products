@@ -1,9 +1,10 @@
 package com.mango.products.infrastructure.web;
 
-import com.mango.products.domain.InvalidPriceRangeException;
-import com.mango.products.domain.PriceNotFoundException;
-import com.mango.products.domain.PriceOverlapException;
-import com.mango.products.domain.ProductNotFoundException;
+import com.mango.products.domain.exception.InvalidHistoryFilterException;
+import com.mango.products.domain.exception.InvalidPriceRangeException;
+import com.mango.products.domain.exception.PriceNotFoundException;
+import com.mango.products.domain.exception.PriceOverlapException;
+import com.mango.products.domain.exception.ProductNotFoundException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -67,6 +68,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
             ex.getMessage());
         problem.setTitle("Invalid price range");
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidHistoryFilterException.class)
+    public ProblemDetail handleInvalidHistoryFilter(InvalidHistoryFilterException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setTitle("Invalid filter");
         return problem;
     }
 }

@@ -1,5 +1,6 @@
-package com.mango.products.domain;
+package com.mango.products.domain.model;
 
+import com.mango.products.domain.exception.InvalidPriceRangeException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

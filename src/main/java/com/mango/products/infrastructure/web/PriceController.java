@@ -1,7 +1,8 @@
 package com.mango.products.infrastructure.web;
 
+import com.mango.products.application.PriceHistoryQuery;
 import com.mango.products.application.PriceService;
-import com.mango.products.domain.Price;
+import com.mango.products.domain.model.Price;
 import com.mango.products.infrastructure.web.dto.CreatePriceRequest;
 import com.mango.products.infrastructure.web.dto.PriceHistoryResponse;
 import com.mango.products.infrastructure.web.dto.PriceResponse;
@@ -64,14 +65,13 @@ public class PriceController {
         return new PriceValueResponse(priceService.findPriceAt(productId, date).getValue());
     }
 
-    @Operation(summary = "Get the price history of a product",
-        description = "Without page or size, returns the full history. With any of them, returns one page.")
-    @ApiResponse(responseCode = "200", description = "Product with its prices, ordered by initDate")
-    @ApiResponse(responseCode = "400", description = "Invalid page, size or order")
-    @ApiResponse(responseCode = "404", description = "Product not found")
     @GetMapping(params = "!date")
     public PriceHistoryResponse getHistory(
         @PathVariable Long productId,
+        @Parameter(description = "Only prices still active on or after this date", example = "2024-06-01")
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate from,
+        @Parameter(description = "Only prices starting on or before this date", example = "2024-08-31")
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate to,
         @Parameter(description = "Page number, starting at 0")
         @RequestParam(required = false) @Min(0) @Nullable Integer page,
         @Parameter(description = "Page size, from 1 to 100")
@@ -79,7 +79,7 @@ public class PriceController {
         @Parameter(description = "Sort direction by initDate", schema = @Schema(allowableValues = {"asc", "desc"}))
         @RequestParam(defaultValue = "asc") @Pattern(regexp = "asc|desc") String order) {
 
-        Sort.Direction direction = Sort.Direction.fromString(order);
-        return PriceHistoryResponse.from(priceService.getHistory(productId, page, size, direction));
+        PriceHistoryQuery query = new PriceHistoryQuery(from, to, page, size, Sort.Direction.fromString(order));
+        return PriceHistoryResponse.from(priceService.getHistory(productId, query));
     }
 }

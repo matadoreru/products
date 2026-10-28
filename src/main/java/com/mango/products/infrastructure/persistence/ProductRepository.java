@@ -1,6 +1,6 @@
 package com.mango.products.infrastructure.persistence;
 
-import com.mango.products.domain.Product;
+import com.mango.products.domain.model.Product;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

@@ -1,7 +1,7 @@
 package com.mango.products.application;
 
-import com.mango.products.domain.Product;
-import com.mango.products.domain.ProductNotFoundException;
+import com.mango.products.domain.exception.ProductNotFoundException;
+import com.mango.products.domain.model.Product;
 import com.mango.products.infrastructure.persistence.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,6 +1,6 @@
 package com.mango.products.infrastructure.web.dto;
 
-import com.mango.products.domain.Product;
+import com.mango.products.domain.model.Product;
 
 public record ProductResponse(Long id, String name, String description) {
 

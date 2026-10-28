@@ -1,5 +1,6 @@
-package com.mango.products.domain;
+package com.mango.products.domain.model;
 
+import com.mango.products.domain.exception.InvalidPriceRangeException;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
