@@ -213,9 +213,17 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
     // OpenAPI
     @Test
     void openApiDocumentIsPublished() {
-        assertThat(mvc.get().uri("/v3/api-docs"))
+        MvcTestResult result = mvc.get().uri("/v3/api-docs").exchange();
+
+        assertThat(result)
             .hasStatusOk()
             .bodyJson().extractingPath("$.paths").asMap()
             .containsKeys("/products", "/products/{id}", "/products/{productId}/prices");
+
+        assertThat(result)
+            .bodyJson()
+            .extractingPath("$.paths['/products/{productId}/prices'].get.parameters[?(@.name == 'date')].required")
+            .asArray()
+            .containsExactly(false);
     }
 }

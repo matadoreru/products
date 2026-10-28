@@ -52,7 +52,7 @@ public class PriceController {
     @ApiResponse(responseCode = "200", description = "Active price found")
     @ApiResponse(responseCode = "400", description = "Invalid date format, expected yyyy-MM-dd")
     @ApiResponse(responseCode = "404", description = "Product not found, or no price active on that date")
-    @Parameter(description = "Date in ISO format", example = "2024-04-15")
+    @Parameter(description = "Date in ISO format. Optional: if omitted, the full price history is returned.", example = "2024-04-15")
     @GetMapping(params = "date")
     public PriceValueResponse getPriceAt(@PathVariable Long productId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return new PriceValueResponse(priceService.findPriceAt(productId, date).getValue());
