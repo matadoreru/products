@@ -3,39 +3,25 @@ package com.mango.products.infrastructure.web.dto;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CreateProductRequestValidationTest {
 
-    private static ValidatorFactory factory;
-    private static Validator validator;
-
-    @BeforeAll
-    static void setUp() {
-        factory = Validation.buildDefaultValidatorFactory();
-        validator = factory.getValidator();
-    }
-
-    @AfterAll
-    static void tearDown() {
-        factory.close();
-    }
+    private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
 
     private static Set<String> invalidFields(CreateProductRequest request) {
-        Set<ConstraintViolation<CreateProductRequest>> violations = validator.validate(request);
+        Set<ConstraintViolation<CreateProductRequest>> violations = VALIDATOR.validate(request);
         return violations.stream()
             .map(violation -> violation.getPropertyPath().toString())
-            .collect(java.util.stream.Collectors.toSet());
+            .collect(Collectors.toSet());
     }
 
     @Test

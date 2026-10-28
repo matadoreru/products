@@ -55,7 +55,8 @@ public class PriceController {
     @ApiResponse(responseCode = "201", description = "Price created. The Location header points to the new price.")
     @ApiResponse(responseCode = "400", description = "Invalid body or currency code, or initDate is not before endDate")
     @ApiResponse(responseCode = "404", description = "Product not found")
-    @ApiResponse(responseCode = "409", description = "The price overlaps an existing price of the product in the same currency")
+    @ApiResponse(responseCode = "409",
+        description = "The price overlaps an existing price of the product in the same currency")
     @PostMapping
     public ResponseEntity<PriceResponse> addPrice(@PathVariable Long productId,
                                                   @Valid @RequestBody PriceRequest request) {
@@ -83,13 +84,14 @@ public class PriceController {
             example = "2024-04-15")
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
         @Parameter(description = "ISO 4217 currency code")
-        @RequestParam(defaultValue = "EUR") @IsoCurrency String currency) {
+        @RequestParam(defaultValue = Price.DEFAULT_CURRENCY_CODE) @IsoCurrency String currency) {
 
         return PriceValueResponse.from(priceService.findPriceAt(productId, Currency.getInstance(currency), date));
     }
 
     @Operation(summary = "Get the price history of a product",
-        description = "Optional filters by date range. Without page or size, returns all matching prices. With any of them, returns one page.")
+        description = "Optional filters by date range. Without page or size, returns all matching prices. "
+            + "With any of them, returns one page.")
     @ApiResponse(responseCode = "200", description = "Product with its prices, ordered by initDate")
     @ApiResponse(responseCode = "400", description = "Invalid page, size, order or date range")
     @ApiResponse(responseCode = "404", description = "Product not found")
@@ -130,7 +132,8 @@ public class PriceController {
     @ApiResponse(responseCode = "200", description = "Price updated")
     @ApiResponse(responseCode = "400", description = "Invalid body or currency code, or initDate is not before endDate")
     @ApiResponse(responseCode = "404", description = "Product not found, or the price does not belong to it")
-    @ApiResponse(responseCode = "409", description = "The price overlaps another price of the product in the same currency")
+    @ApiResponse(responseCode = "409",
+        description = "The price overlaps another price of the product in the same currency")
     @PutMapping("/{priceId}")
     public PriceResponse updatePrice(@PathVariable Long productId, @PathVariable Long priceId,
                                      @Valid @RequestBody PriceRequest request) {

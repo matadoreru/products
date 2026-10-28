@@ -3,9 +3,6 @@ package com.mango.products.infrastructure.web.dto;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -22,22 +19,10 @@ class PriceRequestValidationTest {
     private static final LocalDate INIT = LocalDate.parse("2024-01-01");
     private static final LocalDate END = LocalDate.parse("2024-06-30");
 
-    private static ValidatorFactory factory;
-    private static Validator validator;
-
-    @BeforeAll
-    static void setUp() {
-        factory = Validation.buildDefaultValidatorFactory();
-        validator = factory.getValidator();
-    }
-
-    @AfterAll
-    static void tearDown() {
-        factory.close();
-    }
+    private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
 
     private static Set<String> invalidFields(PriceRequest request) {
-        Set<ConstraintViolation<PriceRequest>> violations = validator.validate(request);
+        Set<ConstraintViolation<PriceRequest>> violations = VALIDATOR.validate(request);
         return violations.stream()
             .map(violation -> violation.getPropertyPath().toString())
             .collect(Collectors.toSet());

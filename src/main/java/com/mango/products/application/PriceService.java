@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class PriceService {
@@ -39,29 +40,43 @@ public class PriceService {
     public Price addPrice(Long productId, BigDecimal value, Currency currency,
                           LocalDate initDate, @Nullable LocalDate endDate) {
         Product product = productService.getForUpdate(productId);
-        Price price = new Price(product, value, initDate, endDate, currency);
+        return saveWithoutOverlap(new Price(product, value, initDate, endDate, currency));
+    }
 
-        boolean overlaps = priceRepository.findByProductIdAndCurrency(productId, currency).stream()
-            .anyMatch(existingPrice -> existingPrice.overlaps(initDate, endDate));
+    @Transactional
+    public Price updatePrice(Long productId, Long priceId, BigDecimal value, Currency currency,
+                             LocalDate initDate, @Nullable LocalDate endDate) {
+        productService.getForUpdate(productId);
+        Price price = priceRepository.findByIdAndProductId(priceId, productId)
+            .orElseThrow(() -> new PriceNotFoundException(productId, priceId));
+        price.update(value, initDate, endDate, currency);
+        return saveWithoutOverlap(price);
+    }
 
-        if (overlaps) {
-            throw new PriceOverlapException(productId, currency, initDate, endDate);
-        }
-
-        try {
-            return priceRepository.saveAndFlush(price);
-        } catch (DataIntegrityViolationException e) {
-            throw new PriceOverlapException(productId, currency, initDate, endDate);
-        }
+    @Transactional
+    public void deletePrice(Long productId, Long priceId) {
+        priceRepository.delete(getPrice(productId, priceId));
     }
 
     @Transactional(readOnly = true)
     public Price findPriceAt(Long productId, Currency currency, LocalDate date) {
-        return priceRepository.findApplicable(productId, currency, date)
-            .orElseThrow(() -> {
-                productService.get(productId);
-                return new PriceNotFoundException(productId, currency, date);
-            });
+        Optional<Price> price = priceRepository.findApplicable(productId, currency, date);
+        if (price.isPresent()) {
+            return price.get();
+        }
+        // Tell an unknown product apart from a product without a price on that date.
+        productService.ensureExists(productId);
+        throw new PriceNotFoundException(productId, currency, date);
+    }
+
+    @Transactional(readOnly = true)
+    public Price getPrice(Long productId, Long priceId) {
+        Optional<Price> price = priceRepository.findByIdAndProductId(priceId, productId);
+        if (price.isPresent()) {
+            return price.get();
+        }
+        productService.ensureExists(productId);
+        throw new PriceNotFoundException(productId, priceId);
     }
 
     @Transactional(readOnly = true)
@@ -82,42 +97,30 @@ public class PriceService {
         return new ProductPriceHistory(product, result.getContent(), PageInfo.from(result));
     }
 
-    @Transactional(readOnly = true)
-    public Price getPrice(Long productId, Long priceId) {
-        return priceRepository.findByIdAndProductId(priceId, productId)
-            .orElseThrow(() -> {
-                productService.get(productId);
-                return new PriceNotFoundException(productId, priceId);
-            });
-    }
-
-    @Transactional
-    public Price updatePrice(Long productId, Long priceId, BigDecimal value, Currency currency,
-                             LocalDate initDate, @Nullable LocalDate endDate) {
-        productService.getForUpdate(productId);
-        Price price = priceRepository.findByIdAndProductId(priceId, productId)
-            .orElseThrow(() -> new PriceNotFoundException(productId, priceId));
-
-        boolean overlaps = priceRepository.findByProductIdAndCurrency(productId, currency).stream()
-            .filter(existingPrice -> !existingPrice.getId().equals(priceId))
-            .anyMatch(existingPrice -> existingPrice.overlaps(initDate, endDate));
-
-        if (overlaps) {
-            throw new PriceOverlapException(productId, currency, initDate, endDate);
-        }
-
-        price.update(value, initDate, endDate, currency);
-
+    /**
+     * Saves the price unless it overlaps another price of the same product and currency.
+     * <p>
+     * The caller holds the product lock, so the in-memory check is reliable and conflicts are
+     * normally reported without hitting the database. The exclusion constraint remains as a safety
+     * net: Hibernate may flush a pending update before the overlap query runs, so a violation can
+     * surface from either statement and both are reported as the same conflict.
+     */
+    private Price saveWithoutOverlap(Price price) {
         try {
+            if (overlapsAnotherPrice(price)) {
+                throw new PriceOverlapException(price);
+            }
             return priceRepository.saveAndFlush(price);
         } catch (DataIntegrityViolationException e) {
-            throw new PriceOverlapException(productId, currency, initDate, endDate);
+            throw new PriceOverlapException(price);
         }
     }
 
-    @Transactional
-    public void deletePrice(Long productId, Long priceId) {
-        priceRepository.delete(getPrice(productId, priceId));
+    private boolean overlapsAnotherPrice(Price price) {
+        Long productId = price.getProduct().getId();
+        return priceRepository.findByProductIdAndCurrency(productId, price.getCurrency()).stream()
+            .filter(other -> !other.getId().equals(price.getId())) // a new price has no id yet
+            .anyMatch(other -> other.overlaps(price.getInitDate(), price.getEndDate()));
     }
 
     private static Specification<Price> buildFilter(Long productId, PriceHistoryQuery query) {
@@ -130,7 +133,6 @@ public class PriceService {
         if (query.to() != null) {
             conditions.add(PriceSpecifications.activeOnOrBefore(query.to()));
         }
-
         if (query.currency() != null) {
             conditions.add(PriceSpecifications.inCurrency(query.currency()));
         }

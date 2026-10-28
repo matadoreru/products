@@ -13,6 +13,7 @@ public record PriceResponse(Long id,
                             String currency) {
 
     public static PriceResponse from(Price price) {
-        return new PriceResponse(price.getId(), price.getValue(), price.getInitDate(), price.getEndDate(), price.getCurrency().getCurrencyCode());
+        return new PriceResponse(price.getId(), price.getValue(), price.getInitDate(), price.getEndDate(),
+            price.getCurrency().getCurrencyCode());
     }
 }

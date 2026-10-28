@@ -2,9 +2,6 @@ package com.mango.products;
 
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -17,18 +14,16 @@ import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class ConcurrentPriceCreationIntegrationTest extends AbstractIntegrationTest {
+class ConcurrentPriceCreationIntegrationTest extends AbstractIntegrationTest {
 
     private static final int THREADS = 10;
 
     @Test
     void onlyOneOfManySimultaneousIdenticalPricesIsAccepted() throws Exception {
         long productId = createProduct("Zapatillas", "Concurrencia");
-        String samePrice = """
-            {"value": 99.99, "initDate": "2024-01-01", "endDate": "2024-06-30"}
-            """;
 
-        List<Integer> statuses = runConcurrently(THREADS, i -> addPrice(productId, samePrice));
+        List<Integer> statuses = runConcurrently(THREADS,
+            i -> addPrice(productId, "99.99", "2024-01-01", "2024-06-30").getResponse().getStatus());
 
         assertThat(statuses).containsOnly(201, 409);
         assertThat(statuses).filteredOn(status -> status == 201).hasSize(1);
@@ -40,9 +35,8 @@ public class ConcurrentPriceCreationIntegrationTest extends AbstractIntegrationT
     void onlyOneOfManySimultaneousOverlappingPricesIsAccepted() throws Exception {
         long productId = createProduct("Camiseta", "Concurrencia");
 
-        List<Integer> statuses = runConcurrently(THREADS, i -> addPrice(productId, """
-            {"value": %d, "initDate": "2024-01-%02d", "endDate": "2024-01-%02d"}
-            """.formatted(10 + i, 1 + i, 15 + i)));
+        List<Integer> statuses = runConcurrently(THREADS, i -> addPrice(productId, String.valueOf(10 + i),
+            "2024-01-%02d".formatted(1 + i), "2024-01-%02d".formatted(15 + i)).getResponse().getStatus());
 
         assertThat(statuses).filteredOn(status -> status == 201).hasSize(1);
         assertThat(statuses).filteredOn(status -> status == 409).hasSize(THREADS - 1);
@@ -55,11 +49,9 @@ public class ConcurrentPriceCreationIntegrationTest extends AbstractIntegrationT
         for (int i = 0; i < THREADS; i++) {
             productIds.add(createProduct("Producto " + i, "Concurrencia"));
         }
-        String samePrice = """
-            {"value": 99.99, "initDate": "2024-01-01", "endDate": "2024-06-30"}
-            """;
 
-        List<Integer> statuses = runConcurrently(THREADS, i -> addPrice(productIds.get(i), samePrice));
+        List<Integer> statuses = runConcurrently(THREADS,
+            i -> addPrice(productIds.get(i), "99.99", "2024-01-01", "2024-06-30").getResponse().getStatus());
 
         assertThat(statuses).containsOnly(201);
     }
@@ -70,6 +62,7 @@ public class ConcurrentPriceCreationIntegrationTest extends AbstractIntegrationT
         int send(int threadIndex) throws Exception;
     }
 
+    /** Sends one request per thread, all released at the same instant, and returns their status codes. */
     private List<Integer> runConcurrently(int threads, Request request) throws Exception {
         CountDownLatch ready = new CountDownLatch(threads);
         CountDownLatch start = new CountDownLatch(1);
@@ -96,32 +89,9 @@ public class ConcurrentPriceCreationIntegrationTest extends AbstractIntegrationT
         }
     }
 
-    private int addPrice(long productId, String json) {
-        return mvc.post().uri("/products/{id}/prices", productId)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(json)
-            .exchange()
-            .getResponse()
-            .getStatus();
-    }
-
-    private long createProduct(String name, String description) throws Exception {
-        MvcTestResult result = mvc.post().uri("/products")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("""
-                {"name": "%s", "description": "%s"}
-                """.formatted(name, description))
-            .exchange();
-
-        assertThat(result).hasStatus(HttpStatus.CREATED);
-        Number id = JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.id");
-        return id.longValue();
-    }
-
     private int countPrices(long productId) throws Exception {
-        MvcTestResult result = mvc.get().uri("/products/{id}/prices", productId).exchange();
-        List<?> prices = JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.prices");
+        List<?> prices = JsonPath.read(
+            history(productId).getResponse().getContentAsString(StandardCharsets.UTF_8), "$.prices");
         return prices.size();
     }
-
 }

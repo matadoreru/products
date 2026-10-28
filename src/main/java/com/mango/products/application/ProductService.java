@@ -26,7 +26,17 @@ public class ProductService {
             .orElseThrow(() -> new ProductNotFoundException(id));
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
+    public void ensureExists(Long id) {
+        if (!productRepository.existsById(id)) {
+            throw new ProductNotFoundException(id);
+        }
+    }
+
+    /**
+     * Loads the product holding a row lock until the surrounding transaction ends, so that
+     * writes to the prices of the same product are serialised. Must be called inside a transaction.
+     */
     Product getForUpdate(Long id) {
         return productRepository.findByIdForUpdate(id)
             .orElseThrow(() -> new ProductNotFoundException(id));

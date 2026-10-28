@@ -19,7 +19,8 @@ import java.util.Currency;
 @Table(name = "price")
 public class Price {
 
-    public static final Currency DEFAULT_CURRENCY = Currency.getInstance("EUR");
+    public static final String DEFAULT_CURRENCY_CODE = "EUR";
+    public static final Currency DEFAULT_CURRENCY = Currency.getInstance(DEFAULT_CURRENCY_CODE);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

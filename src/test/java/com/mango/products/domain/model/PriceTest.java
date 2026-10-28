@@ -14,13 +14,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class PriceTest {
+class PriceTest {
 
     private static final Product PRODUCT = new Product("Zapatillas", "Modelo 2025");
     private static final BigDecimal VALUE = new BigDecimal("99.99");
 
     private static Price price(String initDate, String endDate) {
-        return new Price(PRODUCT, VALUE, LocalDate.parse(initDate), endDate == null ? null : LocalDate.parse(endDate), Price.DEFAULT_CURRENCY);
+        return new Price(PRODUCT, VALUE, LocalDate.parse(initDate),
+            endDate == null ? null : LocalDate.parse(endDate), Price.DEFAULT_CURRENCY);
     }
 
     @Nested

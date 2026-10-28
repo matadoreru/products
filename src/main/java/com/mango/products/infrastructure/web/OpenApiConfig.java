@@ -18,6 +18,11 @@ public class OpenApiConfig {
             .description("Product catalogue with historical prices."));
     }
 
+    /**
+     * GET /products/{productId}/prices is served by two handlers, one with the date parameter and one
+     * without it. springdoc merges both into a single operation and marks date as required, which is
+     * not true for the merged operation, so it is set back to optional here.
+     */
     @Bean
     public OpenApiCustomizer optionalDateOnPricesEndpoint() {
         return openApi -> {

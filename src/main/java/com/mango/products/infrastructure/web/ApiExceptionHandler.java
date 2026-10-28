@@ -25,9 +25,27 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ProductNotFoundException.class)
     public ProblemDetail handleProductNotFound(ProductNotFoundException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-        problem.setTitle("Product not found");
-        return problem;
+        return problem(HttpStatus.NOT_FOUND, "Product not found", ex);
+    }
+
+    @ExceptionHandler(PriceNotFoundException.class)
+    public ProblemDetail handlePriceNotFound(PriceNotFoundException ex) {
+        return problem(HttpStatus.NOT_FOUND, "Price not found", ex);
+    }
+
+    @ExceptionHandler(PriceOverlapException.class)
+    public ProblemDetail handlePriceOverlap(PriceOverlapException ex) {
+        return problem(HttpStatus.CONFLICT, "Price overlap", ex);
+    }
+
+    @ExceptionHandler(InvalidPriceRangeException.class)
+    public ProblemDetail handleInvalidPriceRange(InvalidPriceRangeException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid price range", ex);
+    }
+
+    @ExceptionHandler(InvalidHistoryFilterException.class)
+    public ProblemDetail handleInvalidHistoryFilter(InvalidHistoryFilterException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid filter", ex);
     }
 
     @Override
@@ -40,41 +58,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setTitle("Invalid request");
 
         Map<String, String> errors = new LinkedHashMap<>();
-
-        ex.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), Objects.requireNonNullElse(error.getDefaultMessage(), "invalid value")));
+        ex.getBindingResult().getFieldErrors().forEach(error ->
+            errors.put(error.getField(), Objects.requireNonNullElse(error.getDefaultMessage(), "invalid value")));
         problem.setProperty("errors", errors);
 
         return ResponseEntity.badRequest().body(problem);
     }
 
-    @ExceptionHandler(PriceNotFoundException.class)
-    public ProblemDetail handlePriceNotFound(PriceNotFoundException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND,
-            ex.getMessage());
-        problem.setTitle("Price not found");
-        return problem;
-    }
-
-    @ExceptionHandler(PriceOverlapException.class)
-    public ProblemDetail handlePriceOverlap(PriceOverlapException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
-            ex.getMessage());
-        problem.setTitle("Price overlap");
-        return problem;
-    }
-
-    @ExceptionHandler(InvalidPriceRangeException.class)
-    public ProblemDetail handleInvalidPriceRange(InvalidPriceRangeException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
-            ex.getMessage());
-        problem.setTitle("Invalid price range");
-        return problem;
-    }
-
-    @ExceptionHandler(InvalidHistoryFilterException.class)
-    public ProblemDetail handleInvalidHistoryFilter(InvalidHistoryFilterException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
-        problem.setTitle("Invalid filter");
+    private static ProblemDetail problem(HttpStatus status, String title, RuntimeException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, ex.getMessage());
+        problem.setTitle(title);
         return problem;
     }
 }

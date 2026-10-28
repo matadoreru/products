@@ -1,6 +1,5 @@
 package com.mango.products;
 
-import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -87,9 +86,36 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             .bodyJson().extractingPath("$.name").isEqualTo("Pantalon");
     }
 
+    @Test
+    void unknownProductReturns404OnEveryEndpoint() {
+        long unknown = 999_999L;
+
+        assertThat(history(unknown))
+            .hasStatus(HttpStatus.NOT_FOUND)
+            .bodyJson().extractingPath("$.title").isEqualTo("Product not found");
+        assertThat(priceAt(unknown, "2024-04-15"))
+            .hasStatus(HttpStatus.NOT_FOUND)
+            .bodyJson().extractingPath("$.title").isEqualTo("Product not found");
+        assertThat(addPrice(unknown, "10", "2024-01-01", null))
+            .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
     // ------------------------------------------------------------------
-    // Errores de precios
+    // Alta de precios: solapes y rangos
     // ------------------------------------------------------------------
+
+    @Test
+    void createdPriceHasIdAndLocation() throws Exception {
+        long id = createProduct("Con Location", "Precio nuevo");
+        MvcTestResult result = addPrice(id, "10", "2024-01-01", null);
+
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        long priceId = idOf(result);
+        assertThat(result).headers().hasValue(HttpHeaders.LOCATION,
+            "http://localhost/products/" + id + "/prices/" + priceId);
+        assertThat(getPrice(id, priceId))
+            .hasStatusOk().bodyJson().extractingPath("$.value").isEqualTo(10.0);
+    }
 
     @Test
     void overlappingPriceReturns409() throws Exception {
@@ -130,6 +156,10 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(addPrice(id, "50", "2030-06-01", "2030-01-01")).hasStatus(HttpStatus.BAD_REQUEST);
     }
 
+    // ------------------------------------------------------------------
+    // Precio vigente en una fecha
+    // ------------------------------------------------------------------
+
     @Test
     void invalidDateFormatReturns400() throws Exception {
         long id = createProduct("Guantes", "Cuero");
@@ -157,19 +187,9 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(priceAt(id, "2024-02-15")).hasStatus(HttpStatus.NOT_FOUND);
     }
 
-    @Test
-    void unknownProductReturns404OnEveryEndpoint() {
-        long unknown = 999_999L;
-
-        assertThat(history(unknown))
-            .hasStatus(HttpStatus.NOT_FOUND)
-            .bodyJson().extractingPath("$.title").isEqualTo("Product not found");
-        assertThat(priceAt(unknown, "2024-04-15"))
-            .hasStatus(HttpStatus.NOT_FOUND)
-            .bodyJson().extractingPath("$.title").isEqualTo("Product not found");
-        assertThat(addPrice(unknown, "10", "2024-01-01", null))
-            .hasStatus(HttpStatus.NOT_FOUND);
-    }
+    // ------------------------------------------------------------------
+    // Historial: filtros, paginacion y orden
+    // ------------------------------------------------------------------
 
     @Test
     void historyOfProductWithoutPricesIsEmpty() throws Exception {
@@ -180,65 +200,6 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             .bodyJson().extractingPath("$.prices").asArray().isEmpty();
     }
 
-    // ------------------------------------------------------------------
-    // Utilidades
-    // ------------------------------------------------------------------
-
-    private long createProduct(String name, String description) throws Exception {
-        MvcTestResult result = postJson("/products", """
-            {"name": "%s", "description": "%s"}
-            """.formatted(name, description));
-
-        assertThat(result).hasStatus(HttpStatus.CREATED);
-        Number id = JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.id");
-        return id.longValue();
-    }
-
-    private MvcTestResult addPrice(long productId, String value, String initDate, String endDate) {
-        String end = endDate == null ? "null" : "\"" + endDate + "\"";
-        return postJson("/products/" + productId + "/prices", """
-            {"value": %s, "initDate": "%s", "endDate": %s}
-            """.formatted(value, initDate, end));
-    }
-
-    private MvcTestResult addPriceIn(long productId, String value, String currency,
-                                     String initDate, String endDate) {
-        String end = endDate == null ? "null" : "\"" + endDate + "\"";
-        return postJson("/products/" + productId + "/prices", """
-            {"value": %s, "currency": "%s", "initDate": "%s", "endDate": %s}
-            """.formatted(value, currency, initDate, end));
-    }
-
-    private MvcTestResult priceAt(long productId, String date) {
-        return mvc.get().uri("/products/{id}/prices", productId).param("date", date).exchange();
-    }
-
-    private MvcTestResult history(long productId) {
-        return mvc.get().uri("/products/{id}/prices", productId).exchange();
-    }
-
-    private MvcTestResult postJson(String uri, String json) {
-        return mvc.post().uri(uri).contentType(MediaType.APPLICATION_JSON).content(json).exchange();
-    }
-
-    // OpenAPI
-    @Test
-    void openApiDocumentIsPublished() {
-        MvcTestResult result = mvc.get().uri("/v3/api-docs").exchange();
-
-        assertThat(result)
-            .hasStatusOk()
-            .bodyJson().extractingPath("$.paths").asMap()
-            .containsKeys("/products", "/products/{id}", "/products/{productId}/prices");
-
-        assertThat(result)
-            .bodyJson()
-            .extractingPath("$.paths['/products/{productId}/prices'].get.parameters[?(@.name == 'date')].required")
-            .asArray()
-            .containsExactly(false);
-    }
-
-    // Page
     @Test
     void historyCanBePaginated() throws Exception {
         long id = createProductWithThreePrices();
@@ -261,6 +222,15 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void historyWithoutPaginationHasNoPageBlock() throws Exception {
+        long id = createProductWithThreePrices();
+
+        assertThat(history(id))
+            .hasStatusOk()
+            .bodyJson().doesNotHavePath("$.page");
+    }
+
+    @Test
     void historyCanBeSortedDescending() throws Exception {
         long id = createProductWithThreePrices();
 
@@ -268,15 +238,6 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             .hasStatusOk()
             .bodyJson().extractingPath("$.prices[*].value").asArray()
             .containsExactly(199.99, 129.99, 99.99);
-    }
-
-    @Test
-    void historyWithoutPaginationHasNoPageBlock() throws Exception {
-        long id = createProductWithThreePrices();
-
-        assertThat(mvc.get().uri("/products/{id}/prices", id))
-            .hasStatusOk()
-            .bodyJson().doesNotHavePath("$.page");
     }
 
     @Test
@@ -291,14 +252,6 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             .hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(mvc.get().uri("/products/{id}/prices", id).param("order", "random"))
             .hasStatus(HttpStatus.BAD_REQUEST);
-    }
-
-    private long createProductWithThreePrices() throws Exception {
-        long id = createProduct("Paginado", "Tres precios");
-        addPrice(id, "99.99", "2024-01-01", "2024-06-30");
-        addPrice(id, "129.99", "2024-07-01", "2024-12-31");
-        addPrice(id, "199.99", "2025-01-01", null);
-        return id;
     }
 
     @Test
@@ -347,7 +300,10 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             .bodyJson().extractingPath("$.title").isEqualTo("Invalid filter");
     }
 
-    // Currency
+    // ------------------------------------------------------------------
+    // Divisas
+    // ------------------------------------------------------------------
+
     @Test
     void samePeriodInDifferentCurrenciesIsAllowed() throws Exception {
         long id = createProduct("Multimoneda", "EUR y USD");
@@ -409,48 +365,24 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             .bodyJson().extractingPath("$.prices").asArray().hasSize(2);
     }
 
-    private long priceIdOf(MvcTestResult result) throws Exception {
-        Number id = JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.id");
-        return id.longValue();
-    }
-
-    private MvcTestResult updatePrice(long productId, long priceId, String json) {
-        return mvc.put().uri("/products/{productId}/prices/{priceId}", productId, priceId)
-            .contentType(MediaType.APPLICATION_JSON).content(json).exchange();
-    }
-
-    private MvcTestResult deletePrice(long productId, long priceId) {
-        return mvc.delete().uri("/products/{productId}/prices/{priceId}", productId, priceId).exchange();
-    }
-
-    @Test
-    void createdPriceHasIdAndLocation() throws Exception {
-        long id = createProduct("Con Location", "Precio nuevo");
-        MvcTestResult result = addPrice(id, "10", "2024-01-01", null);
-
-        assertThat(result).hasStatus(HttpStatus.CREATED);
-        long priceId = priceIdOf(result);
-        assertThat(result).headers().hasValue(HttpHeaders.LOCATION,
-            "http://localhost/products/" + id + "/prices/" + priceId);
-        assertThat(mvc.get().uri("/products/{id}/prices/{priceId}", id, priceId))
-            .hasStatusOk().bodyJson().extractingPath("$.value").isEqualTo(10.0);
-    }
+    // ------------------------------------------------------------------
+    // Consulta, reemplazo y borrado de un precio
+    // ------------------------------------------------------------------
 
     @Test
     void priceOfAnotherProductReturns404() throws Exception {
         long owner = createProduct("Propietario", "Tiene el precio");
         long other = createProduct("Otro", "No tiene el precio");
-        long priceId = priceIdOf(addPrice(owner, "10", "2024-01-01", null));
+        long priceId = idOf(addPrice(owner, "10", "2024-01-01", null));
 
-        assertThat(mvc.get().uri("/products/{id}/prices/{priceId}", other, priceId))
-            .hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(getPrice(other, priceId)).hasStatus(HttpStatus.NOT_FOUND);
         assertThat(deletePrice(other, priceId)).hasStatus(HttpStatus.NOT_FOUND);
     }
 
     @Test
     void priceCanBeUpdated() throws Exception {
         long id = createProduct("Actualizable", "Cambia de precio");
-        long priceId = priceIdOf(addPrice(id, "10", "2024-01-01", "2024-06-30"));
+        long priceId = idOf(addPrice(id, "10", "2024-01-01", "2024-06-30"));
 
         assertThat(updatePrice(id, priceId, """
             {"value": 15, "initDate": "2024-02-01", "endDate": "2024-07-31"}
@@ -466,7 +398,7 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     void updateKeepingTheSamePeriodIsNotAnOverlap() throws Exception {
         long id = createProduct("Mismo periodo", "Solo cambia el importe");
-        long priceId = priceIdOf(addPrice(id, "10", "2024-01-01", "2024-06-30"));
+        long priceId = idOf(addPrice(id, "10", "2024-01-01", "2024-06-30"));
 
         assertThat(updatePrice(id, priceId, """
             {"value": 12, "initDate": "2024-01-01", "endDate": "2024-06-30"}
@@ -477,7 +409,7 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
     void updateOverlappingAnotherPriceReturns409() throws Exception {
         long id = createProduct("Solape al actualizar", "Dos precios");
         addPrice(id, "10", "2024-01-01", "2024-06-30");
-        long secondId = priceIdOf(addPrice(id, "20", "2024-07-01", "2024-12-31"));
+        long secondId = idOf(addPrice(id, "20", "2024-07-01", "2024-12-31"));
 
         assertThat(updatePrice(id, secondId, """
             {"value": 20, "initDate": "2024-06-01", "endDate": "2024-12-31"}
@@ -487,7 +419,7 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     void updateWithInvalidDataReturns400() throws Exception {
         long id = createProduct("Datos invalidos", "Al actualizar");
-        long priceId = priceIdOf(addPrice(id, "10", "2024-01-01", null));
+        long priceId = idOf(addPrice(id, "10", "2024-01-01", null));
 
         assertThat(updatePrice(id, priceId, """
             {"value": 10, "initDate": "2024-06-30", "endDate": "2024-01-01"}
@@ -495,6 +427,19 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(updatePrice(id, priceId, """
             {"value": -5, "initDate": "2024-01-01", "endDate": null}
             """)).hasStatus(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void invalidRangeOnUpdateIsReportedBeforeOverlap() throws Exception {
+        long id = createProduct("Rango y solape", "El rango invalido gana, como en el alta");
+        addPrice(id, "10", "2024-01-01", "2024-06-30");
+        long secondId = idOf(addPrice(id, "20", "2024-07-01", "2024-12-31"));
+
+        // Rango invertido que ademas pisa el primer precio: debe ser 400, igual que en el POST
+        assertThat(updatePrice(id, secondId, """
+            {"value": 20, "initDate": "2024-12-31", "endDate": "2024-03-01"}
+            """)).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(addPrice(id, "30", "2024-12-31", "2024-03-01")).hasStatus(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -509,11 +454,10 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     void deletedPriceFreesItsPeriod() throws Exception {
         long id = createProduct("Borrable", "Libera su periodo");
-        long priceId = priceIdOf(addPrice(id, "10", "2024-01-01", "2024-06-30"));
+        long priceId = idOf(addPrice(id, "10", "2024-01-01", "2024-06-30"));
 
         assertThat(deletePrice(id, priceId)).hasStatus(HttpStatus.NO_CONTENT);
-        assertThat(mvc.get().uri("/products/{id}/prices/{priceId}", id, priceId))
-            .hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(getPrice(id, priceId)).hasStatus(HttpStatus.NOT_FOUND);
         assertThat(addPrice(id, "11", "2024-03-01", "2024-08-31")).hasStatus(HttpStatus.CREATED);
     }
 
@@ -522,5 +466,50 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
         long id = createProduct("Nada que borrar", "Id inexistente");
 
         assertThat(deletePrice(id, 999_999L)).hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    // ------------------------------------------------------------------
+    // OpenAPI
+    // ------------------------------------------------------------------
+
+    @Test
+    void openApiDocumentIsPublished() {
+        MvcTestResult result = mvc.get().uri("/v3/api-docs").exchange();
+
+        assertThat(result)
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.paths").asMap()
+            .containsKeys("/products", "/products/{id}", "/products/{productId}/prices");
+
+        assertThat(result)
+            .bodyJson()
+            .extractingPath("$.paths['/products/{productId}/prices'].get.parameters[?(@.name == 'date')].required")
+            .asArray()
+            .containsExactly(false);
+    }
+
+    // ------------------------------------------------------------------
+    // Utilidades
+    // ------------------------------------------------------------------
+
+    private long createProductWithThreePrices() throws Exception {
+        long id = createProduct("Paginado", "Tres precios");
+        addPrice(id, "99.99", "2024-01-01", "2024-06-30");
+        addPrice(id, "129.99", "2024-07-01", "2024-12-31");
+        addPrice(id, "199.99", "2025-01-01", null);
+        return id;
+    }
+
+    private MvcTestResult getPrice(long productId, long priceId) {
+        return mvc.get().uri("/products/{productId}/prices/{priceId}", productId, priceId).exchange();
+    }
+
+    private MvcTestResult updatePrice(long productId, long priceId, String json) {
+        return mvc.put().uri("/products/{productId}/prices/{priceId}", productId, priceId)
+            .contentType(MediaType.APPLICATION_JSON).content(json).exchange();
+    }
+
+    private MvcTestResult deletePrice(long productId, long priceId) {
+        return mvc.delete().uri("/products/{productId}/prices/{priceId}", productId, priceId).exchange();
     }
 }
