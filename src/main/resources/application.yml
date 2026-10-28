@@ -21,3 +21,11 @@ management:
     web:
       exposure:
         include: health
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  override-with-generic-response: false

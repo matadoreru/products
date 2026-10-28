@@ -209,4 +209,13 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
     private MvcTestResult postJson(String uri, String json) {
         return mvc.post().uri(uri).contentType(MediaType.APPLICATION_JSON).content(json).exchange();
     }
+
+    // OpenAPI
+    @Test
+    void openApiDocumentIsPublished() {
+        assertThat(mvc.get().uri("/v3/api-docs"))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.paths").asMap()
+            .containsKeys("/products", "/products/{id}", "/products/{productId}/prices");
+    }
 }
