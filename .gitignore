@@ -1,4 +1,4 @@
 .gradle/
 build/
 .vscode/
-.idea/
+.idea/bin/
