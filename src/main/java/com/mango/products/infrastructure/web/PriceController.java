@@ -65,6 +65,11 @@ public class PriceController {
         return new PriceValueResponse(priceService.findPriceAt(productId, date).getValue());
     }
 
+    @Operation(summary = "Get the price history of a product",
+        description = "Optional filters by date range. Without page or size, returns all matching prices. With any of them, returns one page.")
+    @ApiResponse(responseCode = "200", description = "Product with its prices, ordered by initDate")
+    @ApiResponse(responseCode = "400", description = "Invalid page, size, order or date range")
+    @ApiResponse(responseCode = "404", description = "Product not found")
     @GetMapping(params = "!date")
     public PriceHistoryResponse getHistory(
         @PathVariable Long productId,
