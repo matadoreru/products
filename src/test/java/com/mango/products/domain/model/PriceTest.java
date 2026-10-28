@@ -19,7 +19,7 @@ public class PriceTest {
     private static final BigDecimal VALUE = new BigDecimal("99.99");
 
     private static Price price(String initDate, String endDate) {
-        return new Price(PRODUCT, VALUE, LocalDate.parse(initDate), endDate == null ? null : LocalDate.parse(endDate));
+        return new Price(PRODUCT, VALUE, LocalDate.parse(initDate), endDate == null ? null : LocalDate.parse(endDate), Price.DEFAULT_CURRENCY);
     }
 
     @Nested
@@ -125,8 +125,8 @@ public class PriceTest {
             "2024-01-01,           , 2030-01-01,           "
         })
         void isSymmetric(LocalDate aInit, LocalDate aEnd, LocalDate bInit, LocalDate bEnd) {
-            Price a = new Price(PRODUCT, VALUE, aInit, aEnd);
-            Price b = new Price(PRODUCT, VALUE, bInit, bEnd);
+            Price a = new Price(PRODUCT, VALUE, aInit, aEnd, Price.DEFAULT_CURRENCY);
+            Price b = new Price(PRODUCT, VALUE, bInit, bEnd, Price.DEFAULT_CURRENCY);
             assertThat(a.overlaps(bInit, bEnd)).isEqualTo(b.overlaps(aInit, aEnd));
         }
     }

@@ -44,7 +44,7 @@ class CreatePriceRequestValidationTest {
     }
 
     private static CreatePriceRequest withValue(String value) {
-        return new CreatePriceRequest(new BigDecimal(value), INIT, END);
+        return new CreatePriceRequest(new BigDecimal(value), INIT, END, null);
     }
 
     @Test
@@ -56,7 +56,7 @@ class CreatePriceRequestValidationTest {
 
     @Test
     void valueCannotBeNull() {
-        assertThat(invalidFields(new CreatePriceRequest(null, INIT, END))).containsExactly("value");
+        assertThat(invalidFields(new CreatePriceRequest(null, INIT, END, null))).containsExactly("value");
     }
 
     @ParameterizedTest
@@ -95,17 +95,35 @@ class CreatePriceRequestValidationTest {
 
     @Test
     void initDateCannotBeNull() {
-        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), null, END))).containsExactly("initDate");
+        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), null, END, null))).containsExactly("initDate");
     }
 
     @Test
     void endDateCanBeNull() {
-        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), INIT, null))).isEmpty();
+        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), INIT, null, null))).isEmpty();
     }
 
     @Test
     void severalErrorsAreReportedTogether() {
-        assertThat(invalidFields(new CreatePriceRequest(null, null, null)))
+        assertThat(invalidFields(new CreatePriceRequest(null, null, null, null)))
             .containsExactlyInAnyOrder("value", "initDate");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"EUR", "USD", "GBP", "JPY"})
+    void validCurrencyCodesAreAccepted(String currency) {
+        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), INIT, END, currency))).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"eur", "ABC", "EURO", "E", ""})
+    void invalidCurrencyCodesAreRejected(String currency) {
+        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), INIT, END, currency)))
+            .containsExactly("currency");
+    }
+
+    @Test
+    void currencyCanBeNull() {
+        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), INIT, END, null))).isEmpty();
     }
 }

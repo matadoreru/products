@@ -26,13 +26,13 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(addPrice(id, "199.99", "2025-01-01", null)).hasStatus(HttpStatus.CREATED);
 
         assertThat(priceAt(id, "2024-04-15")).hasStatusOk().bodyJson().isStrictlyEqualTo("""
-            {"value": 99.99}
+            {"value": 99.99, "currency": "EUR"}
             """);
         assertThat(priceAt(id, "2024-08-15")).hasStatusOk().bodyJson().isStrictlyEqualTo("""
-            {"value": 129.99}
+            {"value": 129.99, "currency": "EUR"}
             """);
         assertThat(priceAt(id, "2025-03-01")).hasStatusOk().bodyJson().isStrictlyEqualTo("""
-            {"value": 199.99}
+            {"value": 199.99, "currency": "EUR"}
             """);
 
         assertThat(history(id)).hasStatusOk().bodyJson().isStrictlyEqualTo("""
@@ -40,9 +40,9 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
               "name": "Zapatillas deportivas",
               "description": "Modelo 2025 edicion limitada",
               "prices": [
-                {"value": 99.99,  "initDate": "2024-01-01", "endDate": "2024-06-30"},
-                {"value": 129.99, "initDate": "2024-07-01", "endDate": "2024-12-31"},
-                {"value": 199.99, "initDate": "2025-01-01", "endDate": null}
+                {"value": 99.99,  "currency": "EUR", "initDate": "2024-01-01", "endDate": "2024-06-30"},
+                {"value": 129.99, "currency": "EUR", "initDate": "2024-07-01", "endDate": "2024-12-31"},
+                {"value": 199.99, "currency": "EUR", "initDate": "2025-01-01", "endDate": null}
               ]
             }
             """);
@@ -198,6 +198,14 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             """.formatted(value, initDate, end));
     }
 
+    private MvcTestResult addPriceIn(long productId, String value, String currency,
+                                     String initDate, String endDate) {
+        String end = endDate == null ? "null" : "\"" + endDate + "\"";
+        return postJson("/products/" + productId + "/prices", """
+            {"value": %s, "currency": "%s", "initDate": "%s", "endDate": %s}
+            """.formatted(value, currency, initDate, end));
+    }
+
     private MvcTestResult priceAt(long productId, String date) {
         return mvc.get().uri("/products/{id}/prices", productId).param("date", date).exchange();
     }
@@ -334,5 +342,67 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             .param("from", "2025-01-01").param("to", "2024-01-01"))
             .hasStatus(HttpStatus.BAD_REQUEST)
             .bodyJson().extractingPath("$.title").isEqualTo("Invalid filter");
+    }
+
+    // Currency
+    @Test
+    void samePeriodInDifferentCurrenciesIsAllowed() throws Exception {
+        long id = createProduct("Multimoneda", "EUR y USD");
+
+        assertThat(addPrice(id, "99.99", "2024-01-01", "2024-06-30")).hasStatus(HttpStatus.CREATED);
+        assertThat(addPriceIn(id, "109.99", "USD", "2024-01-01", "2024-06-30")).hasStatus(HttpStatus.CREATED);
+
+        assertThat(priceAt(id, "2024-04-15")).hasStatusOk().bodyJson().isStrictlyEqualTo("""
+            {"value": 99.99, "currency": "EUR"}
+            """);
+        assertThat(mvc.get().uri("/products/{id}/prices", id)
+            .param("date", "2024-04-15").param("currency", "USD"))
+            .hasStatusOk().bodyJson().isStrictlyEqualTo("""
+                {"value": 109.99, "currency": "USD"}
+                """);
+    }
+
+    @Test
+    void overlappingPriceInSameCurrencyReturns409() throws Exception {
+        long id = createProduct("Solape USD", "Misma moneda");
+        addPriceIn(id, "10", "USD", "2024-01-01", "2024-06-30");
+
+        assertThat(addPriceIn(id, "20", "USD", "2024-03-01", "2024-08-31")).hasStatus(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void priceAtDateInCurrencyWithoutPricesReturns404() throws Exception {
+        long id = createProduct("Solo EUR", "Sin precios en USD");
+        addPrice(id, "10", "2024-01-01", null);
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id)
+            .param("date", "2024-04-15").param("currency", "USD"))
+            .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void invalidCurrencyReturns400() throws Exception {
+        long id = createProduct("Moneda invalida", "Codigos incorrectos");
+
+        assertThat(addPriceIn(id, "10", "ABC", "2024-01-01", null))
+            .hasStatus(HttpStatus.BAD_REQUEST)
+            .bodyJson().extractingPath("$.errors.currency").isNotNull();
+        assertThat(mvc.get().uri("/products/{id}/prices", id)
+            .param("date", "2024-04-15").param("currency", "usd"))
+            .hasStatus(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void historyCanBeFilteredByCurrency() throws Exception {
+        long id = createProduct("Filtro moneda", "EUR y USD");
+        addPrice(id, "99.99", "2024-01-01", null);
+        addPriceIn(id, "109.99", "USD", "2024-01-01", null);
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("currency", "USD"))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.prices[*].currency").asArray().containsExactly("USD");
+        assertThat(history(id))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.prices").asArray().hasSize(2);
     }
 }

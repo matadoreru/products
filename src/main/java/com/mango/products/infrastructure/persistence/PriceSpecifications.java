@@ -4,6 +4,7 @@ import com.mango.products.domain.model.Price;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
+import java.util.Currency;
 
 public final class PriceSpecifications {
 
@@ -23,5 +24,9 @@ public final class PriceSpecifications {
 
     public static Specification<Price> activeOnOrBefore(LocalDate to) {
         return (root, query, cb) -> cb.lessThanOrEqualTo(root.<LocalDate>get("initDate"), to);
+    }
+
+    public static Specification<Price> inCurrency(Currency currency) {
+        return (root, query, cb) -> cb.equal(root.get("currency"), currency);
     }
 }

@@ -5,10 +5,12 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
+import java.util.Currency;
 
 public record PriceHistoryQuery(
     @Nullable LocalDate from,
     @Nullable LocalDate to,
+    @Nullable Currency currency,
     @Nullable Integer page,
     @Nullable Integer size,
     Sort.Direction direction) {

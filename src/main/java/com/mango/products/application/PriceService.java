@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Currency;
 import java.util.List;
 
 @Service
@@ -35,30 +36,31 @@ public class PriceService {
     }
 
     @Transactional
-    public Price addPrice(Long productId, BigDecimal value, LocalDate initDate, @Nullable LocalDate endDate) {
+    public Price addPrice(Long productId, BigDecimal value, Currency currency,
+                          LocalDate initDate, @Nullable LocalDate endDate) {
         Product product = productService.getForUpdate(productId);
-        Price price = new Price(product, value, initDate, endDate);
+        Price price = new Price(product, value, initDate, endDate, currency);
 
-        boolean overlaps = priceRepository.findByProductIdOrderByInitDate(productId).stream()
+        boolean overlaps = priceRepository.findByProductIdAndCurrency(productId, currency).stream()
             .anyMatch(existingPrice -> existingPrice.overlaps(initDate, endDate));
 
         if (overlaps) {
-            throw new PriceOverlapException(productId, initDate, endDate);
+            throw new PriceOverlapException(productId, currency, initDate, endDate);
         }
 
         try {
             return priceRepository.saveAndFlush(price);
         } catch (DataIntegrityViolationException e) {
-            throw new PriceOverlapException(productId, initDate, endDate);
+            throw new PriceOverlapException(productId, currency, initDate, endDate);
         }
     }
 
     @Transactional(readOnly = true)
-    public Price findPriceAt(Long productId, LocalDate date) {
-        return priceRepository.findApplicable(productId, date)
+    public Price findPriceAt(Long productId, Currency currency, LocalDate date) {
+        return priceRepository.findApplicable(productId, currency, date)
             .orElseThrow(() -> {
                 productService.get(productId);
-                return new PriceNotFoundException(productId, date);
+                return new PriceNotFoundException(productId, currency, date);
             });
     }
 
@@ -83,12 +85,18 @@ public class PriceService {
     private static Specification<Price> buildFilter(Long productId, PriceHistoryQuery query) {
         List<Specification<Price>> conditions = new ArrayList<>();
         conditions.add(PriceSpecifications.ofProduct(productId));
+
         if (query.from() != null) {
             conditions.add(PriceSpecifications.activeOnOrAfter(query.from()));
         }
         if (query.to() != null) {
             conditions.add(PriceSpecifications.activeOnOrBefore(query.to()));
         }
+
+        if (query.currency() != null) {
+            conditions.add(PriceSpecifications.inCurrency(query.currency()));
+        }
+
         return Specification.allOf(conditions);
     }
 }

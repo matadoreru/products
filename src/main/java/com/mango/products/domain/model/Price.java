@@ -13,10 +13,13 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Currency;
 
 @Entity
 @Table(name = "price")
 public class Price {
+
+    public static final Currency DEFAULT_CURRENCY = Currency.getInstance("EUR");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,10 +38,13 @@ public class Price {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    @Column(name = "currency", nullable = false, length = 3)
+    private Currency currency;
+
     protected Price() {
     }
 
-    public Price(Product product, BigDecimal value, LocalDate initDate, LocalDate endDate) {
+    public Price(Product product, BigDecimal value, LocalDate initDate, LocalDate endDate, Currency currency) {
         if (endDate != null && !initDate.isBefore(endDate)) {
             throw new InvalidPriceRangeException(initDate, endDate);
         }
@@ -47,6 +53,7 @@ public class Price {
         this.value = value;
         this.initDate = initDate;
         this.endDate = endDate;
+        this.currency = currency;
     }
 
     public boolean isActive(LocalDate date) {
@@ -77,5 +84,9 @@ public class Price {
 
     public Product getProduct() {
         return product;
+    }
+
+    public Currency getCurrency() {
+        return currency;
     }
 }
