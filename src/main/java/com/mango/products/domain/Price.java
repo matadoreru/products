@@ -35,7 +35,6 @@ public class Price {
     private LocalDate endDate;
 
     protected Price() {
-
     }
 
     public Price(Product product, BigDecimal value, LocalDate initDate, LocalDate endDate) {

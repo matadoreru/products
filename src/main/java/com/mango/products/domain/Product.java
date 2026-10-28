@@ -16,10 +16,13 @@ public class Product {
     private Long id;
 
     @Column(name = "name", nullable = false)
-    private final String name;
+    private String name;
 
     @Column(name = "description", length = 1000)
-    private final String description;
+    private String description;
+
+    protected Product() {
+    }
 
     public Product(String name, String description) {
         this.name = name;

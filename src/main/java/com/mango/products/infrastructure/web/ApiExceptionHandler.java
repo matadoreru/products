@@ -1,5 +1,8 @@
 package com.mango.products.infrastructure.web;
 
+import com.mango.products.domain.InvalidPriceRangeException;
+import com.mango.products.domain.PriceNotFoundException;
+import com.mango.products.domain.PriceOverlapException;
 import com.mango.products.domain.ProductNotFoundException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,5 +44,29 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setProperty("errors", errors);
 
         return ResponseEntity.badRequest().body(problem);
+    }
+
+    @ExceptionHandler(PriceNotFoundException.class)
+    public ProblemDetail handlePriceNotFound(PriceNotFoundException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND,
+            ex.getMessage());
+        problem.setTitle("Price not found");
+        return problem;
+    }
+
+    @ExceptionHandler(PriceOverlapException.class)
+    public ProblemDetail handlePriceOverlap(PriceOverlapException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+            ex.getMessage());
+        problem.setTitle("Price overlap");
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidPriceRangeException.class)
+    public ProblemDetail handleInvalidPriceRange(InvalidPriceRangeException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+            ex.getMessage());
+        problem.setTitle("Invalid price range");
+        return problem;
     }
 }
