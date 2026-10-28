@@ -16,8 +16,8 @@ spring:
     virtual:
       enabled: true
 
-  management:
-    endpoints:
-      web:
-        exposure:
-          include: health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
