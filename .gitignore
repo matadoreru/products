@@ -1,4 +1,7 @@
 .gradle/
 build/
+bin/
+out/
 .vscode/
-.idea/bin/
+.idea/
+*.iml
