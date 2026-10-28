@@ -226,4 +226,67 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             .asArray()
             .containsExactly(false);
     }
+
+    // Page
+    @Test
+    void historyCanBePaginated() throws Exception {
+        long id = createProductWithThreePrices();
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("page", "0").param("size", "2"))
+            .hasStatusOk()
+            .bodyJson().isLenientlyEqualTo("""
+                {
+                  "prices": [
+                    {"value": 99.99,  "initDate": "2024-01-01"},
+                    {"value": 129.99, "initDate": "2024-07-01"}
+                  ],
+                  "page": {"number": 0, "size": 2, "totalElements": 3, "totalPages": 2}
+                }
+                """);
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("page", "1").param("size", "2"))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.prices[*].value").asArray().containsExactly(199.99);
+    }
+
+    @Test
+    void historyCanBeSortedDescending() throws Exception {
+        long id = createProductWithThreePrices();
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("order", "desc"))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.prices[*].value").asArray()
+            .containsExactly(199.99, 129.99, 99.99);
+    }
+
+    @Test
+    void historyWithoutPaginationHasNoPageBlock() throws Exception {
+        long id = createProductWithThreePrices();
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id))
+            .hasStatusOk()
+            .bodyJson().doesNotHavePath("$.page");
+    }
+
+    @Test
+    void invalidPaginationParametersReturn400() throws Exception {
+        long id = createProductWithThreePrices();
+
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("page", "-1"))
+            .hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("size", "0"))
+            .hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("size", "101"))
+            .hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(mvc.get().uri("/products/{id}/prices", id).param("order", "random"))
+            .hasStatus(HttpStatus.BAD_REQUEST);
+    }
+
+    private long createProductWithThreePrices() throws Exception {
+        long id = createProduct("Paginado", "Tres precios");
+        addPrice(id, "99.99", "2024-01-01", "2024-06-30");
+        addPrice(id, "129.99", "2024-07-01", "2024-12-31");
+        addPrice(id, "199.99", "2025-01-01", null);
+        return id;
+    }
 }

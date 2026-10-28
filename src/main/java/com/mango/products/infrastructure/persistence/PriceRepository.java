@@ -1,6 +1,9 @@
 package com.mango.products.infrastructure.persistence;
 
 import com.mango.products.domain.Price;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,4 +23,9 @@ public interface PriceRepository extends JpaRepository<Price, Long> {
     Optional<Price> findApplicable(@Param("productId") Long productId, @Param("date") LocalDate date);
 
     List<Price> findByProductIdOrderByInitDate(Long productId);
+
+    List<Price> findByProductId(Long productId, Sort sort);
+
+    Page<Price> findByProductId(Long productId, Pageable pageable);
+
 }

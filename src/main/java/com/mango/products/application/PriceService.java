@@ -7,6 +7,10 @@ import com.mango.products.domain.Product;
 import com.mango.products.infrastructure.persistence.PriceRepository;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +20,8 @@ import java.util.List;
 
 @Service
 public class PriceService {
+
+    private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final PriceRepository priceRepository;
     private final ProductService productService;
@@ -54,9 +60,21 @@ public class PriceService {
     }
 
     @Transactional(readOnly = true)
-    public ProductPriceHistory getHistory(Long productId) {
+    public ProductPriceHistory getHistory(Long productId, @Nullable Integer page,
+                                          @Nullable Integer size, Sort.Direction direction) {
         Product product = productService.get(productId);
-        List<Price> prices = priceRepository.findByProductIdOrderByInitDate(productId);
-        return new ProductPriceHistory(product, prices);
+        Sort sort = Sort.by(direction, "initDate");
+
+        if (page == null && size == null) {
+            List<Price> prices = priceRepository.findByProductId(productId, sort);
+            return new ProductPriceHistory(product, prices, null);
+        }
+
+        Pageable pageable = PageRequest.of(
+            page == null ? 0 : page,
+            size == null ? DEFAULT_PAGE_SIZE : size,
+            sort);
+        Page<Price> result = priceRepository.findByProductId(productId, pageable);
+        return new ProductPriceHistory(product, result.getContent(), PageInfo.from(result));
     }
 }

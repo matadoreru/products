@@ -8,9 +8,15 @@ import com.mango.products.infrastructure.web.dto.PriceResponse;
 import com.mango.products.infrastructure.web.dto.PriceValueResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
+import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,21 +54,32 @@ public class PriceController {
     }
 
     @Operation(summary = "Get the price active on a date",
-        description = "With the date parameter, returns the price active on that date. Without it, returns the full price history.")
+        description = "With the date parameter, returns the price active on that date. Without it, returns the price history.")
     @ApiResponse(responseCode = "200", description = "Active price found")
     @ApiResponse(responseCode = "400", description = "Invalid date format, expected yyyy-MM-dd")
     @ApiResponse(responseCode = "404", description = "Product not found, or no price active on that date")
-    @Parameter(description = "Date in ISO format. Optional: if omitted, the full price history is returned.", example = "2024-04-15")
     @GetMapping(params = "date")
-    public PriceValueResponse getPriceAt(@PathVariable Long productId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    public PriceValueResponse getPriceAt(@PathVariable Long productId, @RequestParam @Parameter(description = "Date in ISO format. Optional: if omitted, the full price history is returned.", example = "2024-04-15")
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return new PriceValueResponse(priceService.findPriceAt(productId, date).getValue());
     }
 
-    @Operation(summary = "Get the full price history of a product")
-    @ApiResponse(responseCode = "200", description = "Product with all its prices, ordered by initDate")
+    @Operation(summary = "Get the price history of a product",
+        description = "Without page or size, returns the full history. With any of them, returns one page.")
+    @ApiResponse(responseCode = "200", description = "Product with its prices, ordered by initDate")
+    @ApiResponse(responseCode = "400", description = "Invalid page, size or order")
     @ApiResponse(responseCode = "404", description = "Product not found")
     @GetMapping(params = "!date")
-    public PriceHistoryResponse getHistory(@PathVariable Long productId) {
-        return PriceHistoryResponse.from(priceService.getHistory(productId));
+    public PriceHistoryResponse getHistory(
+        @PathVariable Long productId,
+        @Parameter(description = "Page number, starting at 0")
+        @RequestParam(required = false) @Min(0) @Nullable Integer page,
+        @Parameter(description = "Page size, from 1 to 100")
+        @RequestParam(required = false) @Min(1) @Max(100) @Nullable Integer size,
+        @Parameter(description = "Sort direction by initDate", schema = @Schema(allowableValues = {"asc", "desc"}))
+        @RequestParam(defaultValue = "asc") @Pattern(regexp = "asc|desc") String order) {
+
+        Sort.Direction direction = Sort.Direction.fromString(order);
+        return PriceHistoryResponse.from(priceService.getHistory(productId, page, size, direction));
     }
 }
