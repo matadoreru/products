@@ -1,6 +1,6 @@
-# Productos con precios históricos
+# Productos con precios históricos (Capitole Hortensi Martin Florit)
 
-Solución a la prueba técnica de backend de Mango de Hortensi Martin Florit.
+Solución a la prueba técnica de backend de Mango (Capitole) de Hortensi Martin Florit.
 API REST para gestionar productos y su historial de precios. Cada producto puede tener varios precios a lo largo del
 tiempo, pero solo uno vigente para una misma fecha y moneda.
 
