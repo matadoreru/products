@@ -25,4 +25,10 @@ public class ProductService {
         return productRepository.findById(id)
             .orElseThrow(() -> new ProductNotFoundException(id));
     }
+
+    @Transactional
+    Product getForUpdate(Long id) {
+        return productRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new ProductNotFoundException(id));
+    }
 }

@@ -27,7 +27,7 @@ public class PriceService {
 
     @Transactional
     public Price addPrice(Long productId, BigDecimal value, LocalDate initDate, @Nullable LocalDate endDate) {
-        Product product = productService.get(productId);
+        Product product = productService.getForUpdate(productId);
         Price price = new Price(product, value, initDate, endDate);
 
         boolean overlaps = priceRepository.findByProductIdOrderByInitDate(productId).stream()
