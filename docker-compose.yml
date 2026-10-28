@@ -1,6 +1,21 @@
-version: "3.9"
-
 services:
+  db:
+    image: postgres:17-alpine
+    container_name: product-db
+    environment:
+      POSTGRES_DB: products
+      POSTGRES_USER: products
+      POSTGRES_PASSWORD: products
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U products -d products" ]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
   app:
     build:
       context: .
@@ -8,8 +23,13 @@ services:
     container_name: product-api
     ports:
       - "8080:8080"
-    command: >
-      java -cp app.jar com.mango.App
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/products
+      DB_USER: products
+      DB_PASSWORD: products
+    depends_on:
+      db:
+        condition: service_healthy
     deploy:
       resources:
         limits:

@@ -1,9 +1,19 @@
-FROM gradle:8.5.0-jdk21 AS build
-COPY --chown=gradle:gradle . /home/gradle/project
-WORKDIR /home/gradle/project
-RUN gradle clean build
+FROM eclipse-temurin:25-jdk AS build
+WORKDIR /workspace
 
-FROM eclipse-temurin:21-jdk
+COPY gradlew settings.gradle build.gradle ./
+COPY gradle gradle
+RUN ./gradlew dependencies --no-daemon -q
+
+COPY src src
+RUN ./gradlew bootJar -x test --no-daemon
+
+FROM eclipse-temurin:25-jre
 WORKDIR /app
-COPY --from=build /home/gradle/project/build/libs/*.jar app.jar
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+RUN groupadd --system app && useradd --system --gid app app
+COPY --from=build /workspace/build/libs/*.jar app.jar
+USER app
+
+EXPOSE 8080
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+UseSerialGC", "-jar", "app.jar"]
