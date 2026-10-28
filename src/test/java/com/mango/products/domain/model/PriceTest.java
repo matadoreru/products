@@ -8,6 +8,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Currency;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -128,6 +129,35 @@ public class PriceTest {
             Price a = new Price(PRODUCT, VALUE, aInit, aEnd, Price.DEFAULT_CURRENCY);
             Price b = new Price(PRODUCT, VALUE, bInit, bEnd, Price.DEFAULT_CURRENCY);
             assertThat(a.overlaps(bInit, bEnd)).isEqualTo(b.overlaps(aInit, aEnd));
+        }
+    }
+
+    @Nested
+    class Update {
+
+        @Test
+        void replacesAllFields() {
+            Price price = price("2024-01-01", "2024-06-30");
+            Currency usd = Currency.getInstance("USD");
+
+            price.update(new BigDecimal("50.00"), LocalDate.parse("2025-01-01"), null, usd);
+
+            assertThat(price.getValue()).isEqualByComparingTo("50.00");
+            assertThat(price.getInitDate()).isEqualTo(LocalDate.parse("2025-01-01"));
+            assertThat(price.getEndDate()).isNull();
+            assertThat(price.getCurrency()).isEqualTo(usd);
+        }
+
+        @Test
+        void invalidRangeLeavesPriceUnchanged() {
+            Price price = price("2024-01-01", "2024-06-30");
+
+            assertThatThrownBy(() -> price.update(new BigDecimal("50.00"),
+                LocalDate.parse("2024-06-30"), LocalDate.parse("2024-01-01"), Price.DEFAULT_CURRENCY))
+                .isInstanceOf(InvalidPriceRangeException.class);
+
+            assertThat(price.getValue()).isEqualByComparingTo("99.99");
+            assertThat(price.getInitDate()).isEqualTo(LocalDate.parse("2024-01-01"));
         }
     }
 

@@ -8,4 +8,8 @@ public class PriceNotFoundException extends RuntimeException {
     public PriceNotFoundException(Long productId, Currency currency, LocalDate date) {
         super("No price in %s found for product ID %d on date %s.".formatted(currency, productId, date));
     }
+
+    public PriceNotFoundException(Long productId, Long priceId) {
+        super("Price %d not found for product ID %d.".formatted(priceId, productId));
+    }
 }

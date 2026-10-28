@@ -25,4 +25,6 @@ public interface PriceRepository extends JpaRepository<Price, Long>, JpaSpecific
                                    @Param("date") LocalDate date);
 
     List<Price> findByProductIdAndCurrency(Long productId, Currency currency);
+
+    Optional<Price> findByIdAndProductId(Long id, Long productId);
 }

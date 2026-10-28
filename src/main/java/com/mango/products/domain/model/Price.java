@@ -45,15 +45,26 @@ public class Price {
     }
 
     public Price(Product product, BigDecimal value, LocalDate initDate, LocalDate endDate, Currency currency) {
-        if (endDate != null && !initDate.isBefore(endDate)) {
-            throw new InvalidPriceRangeException(initDate, endDate);
-        }
-
+        validateRange(initDate, endDate);
         this.product = product;
         this.value = value;
         this.initDate = initDate;
         this.endDate = endDate;
         this.currency = currency;
+    }
+
+    public void update(BigDecimal value, LocalDate initDate, LocalDate endDate, Currency currency) {
+        validateRange(initDate, endDate);
+        this.value = value;
+        this.initDate = initDate;
+        this.endDate = endDate;
+        this.currency = currency;
+    }
+
+    private static void validateRange(LocalDate initDate, LocalDate endDate) {
+        if (endDate != null && !initDate.isBefore(endDate)) {
+            throw new InvalidPriceRangeException(initDate, endDate);
+        }
     }
 
     public boolean isActive(LocalDate date) {

@@ -3,8 +3,8 @@ package com.mango.products.infrastructure.web;
 import com.mango.products.application.PriceHistoryQuery;
 import com.mango.products.application.PriceService;
 import com.mango.products.domain.model.Price;
-import com.mango.products.infrastructure.web.dto.CreatePriceRequest;
 import com.mango.products.infrastructure.web.dto.PriceHistoryResponse;
+import com.mango.products.infrastructure.web.dto.PriceRequest;
 import com.mango.products.infrastructure.web.dto.PriceResponse;
 import com.mango.products.infrastructure.web.dto.PriceValueResponse;
 import com.mango.products.infrastructure.web.validation.IsoCurrency;
@@ -22,14 +22,19 @@ import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.util.Currency;
 
@@ -47,16 +52,22 @@ public class PriceController {
     @Operation(summary = "Add a price to a product",
         description = "Prices of the same product and currency cannot overlap. endDate is inclusive and can be null "
             + "for an open-ended price. currency is optional and defaults to EUR.")
-    @ApiResponse(responseCode = "201", description = "Price created")
+    @ApiResponse(responseCode = "201", description = "Price created. The Location header points to the new price.")
     @ApiResponse(responseCode = "400", description = "Invalid body or currency code, or initDate is not before endDate")
     @ApiResponse(responseCode = "404", description = "Product not found")
     @ApiResponse(responseCode = "409", description = "The price overlaps an existing price of the product in the same currency")
     @PostMapping
-    public ResponseEntity<PriceResponse> addPrice(@PathVariable Long productId, @Valid @RequestBody CreatePriceRequest request) {
+    public ResponseEntity<PriceResponse> addPrice(@PathVariable Long productId,
+                                                  @Valid @RequestBody PriceRequest request) {
         Price price = priceService.addPrice(productId, request.value(), toCurrency(request.currency()),
             request.initDate(), request.endDate());
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(PriceResponse.from(price));
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+            .path("/{priceId}")
+            .buildAndExpand(price.getId())
+            .toUri();
+
+        return ResponseEntity.created(location).body(PriceResponse.from(price));
     }
 
     @Operation(summary = "Get the price active on a date",
@@ -102,6 +113,39 @@ public class PriceController {
             currency == null ? null : Currency.getInstance(currency),
             page, size, Sort.Direction.fromString(order));
         return PriceHistoryResponse.from(priceService.getHistory(productId, query));
+    }
+
+    @Operation(summary = "Get a price by id")
+    @ApiResponse(responseCode = "200", description = "Price found")
+    @ApiResponse(responseCode = "404", description = "Product not found, or the price does not belong to it")
+    @GetMapping("/{priceId}")
+    public PriceResponse getPrice(@PathVariable Long productId, @PathVariable Long priceId) {
+        return PriceResponse.from(priceService.getPrice(productId, priceId));
+    }
+
+    @Operation(summary = "Replace a price",
+        description = "Replaces all the fields of the price. currency is optional and defaults to EUR, "
+            + "even if the price had another currency. The price cannot overlap other prices of the product "
+            + "in the same currency.")
+    @ApiResponse(responseCode = "200", description = "Price updated")
+    @ApiResponse(responseCode = "400", description = "Invalid body or currency code, or initDate is not before endDate")
+    @ApiResponse(responseCode = "404", description = "Product not found, or the price does not belong to it")
+    @ApiResponse(responseCode = "409", description = "The price overlaps another price of the product in the same currency")
+    @PutMapping("/{priceId}")
+    public PriceResponse updatePrice(@PathVariable Long productId, @PathVariable Long priceId,
+                                     @Valid @RequestBody PriceRequest request) {
+        Price price = priceService.updatePrice(productId, priceId, request.value(), toCurrency(request.currency()),
+            request.initDate(), request.endDate());
+        return PriceResponse.from(price);
+    }
+
+    @Operation(summary = "Delete a price")
+    @ApiResponse(responseCode = "204", description = "Price deleted")
+    @ApiResponse(responseCode = "404", description = "Product not found, or the price does not belong to it")
+    @DeleteMapping("/{priceId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePrice(@PathVariable Long productId, @PathVariable Long priceId) {
+        priceService.deletePrice(productId, priceId);
     }
 
     private static Currency toCurrency(@Nullable String code) {

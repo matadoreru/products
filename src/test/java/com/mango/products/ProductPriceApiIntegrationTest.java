@@ -35,7 +35,7 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
             {"value": 199.99, "currency": "EUR"}
             """);
 
-        assertThat(history(id)).hasStatusOk().bodyJson().isStrictlyEqualTo("""
+        assertThat(history(id)).hasStatusOk().bodyJson().isLenientlyEqualTo("""
             {
               "name": "Zapatillas deportivas",
               "description": "Modelo 2025 edicion limitada",
@@ -46,6 +46,9 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
               ]
             }
             """);
+        assertThat(history(id)).bodyJson().extractingPath("$.prices[*].id").asArray()
+            .hasSize(3).doesNotContainNull();
+        assertThat(history(id)).bodyJson().doesNotHavePath("$.page");
     }
 
     // ------------------------------------------------------------------
@@ -404,5 +407,120 @@ class ProductPriceApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(history(id))
             .hasStatusOk()
             .bodyJson().extractingPath("$.prices").asArray().hasSize(2);
+    }
+
+    private long priceIdOf(MvcTestResult result) throws Exception {
+        Number id = JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.id");
+        return id.longValue();
+    }
+
+    private MvcTestResult updatePrice(long productId, long priceId, String json) {
+        return mvc.put().uri("/products/{productId}/prices/{priceId}", productId, priceId)
+            .contentType(MediaType.APPLICATION_JSON).content(json).exchange();
+    }
+
+    private MvcTestResult deletePrice(long productId, long priceId) {
+        return mvc.delete().uri("/products/{productId}/prices/{priceId}", productId, priceId).exchange();
+    }
+
+    @Test
+    void createdPriceHasIdAndLocation() throws Exception {
+        long id = createProduct("Con Location", "Precio nuevo");
+        MvcTestResult result = addPrice(id, "10", "2024-01-01", null);
+
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        long priceId = priceIdOf(result);
+        assertThat(result).headers().hasValue(HttpHeaders.LOCATION,
+            "http://localhost/products/" + id + "/prices/" + priceId);
+        assertThat(mvc.get().uri("/products/{id}/prices/{priceId}", id, priceId))
+            .hasStatusOk().bodyJson().extractingPath("$.value").isEqualTo(10.0);
+    }
+
+    @Test
+    void priceOfAnotherProductReturns404() throws Exception {
+        long owner = createProduct("Propietario", "Tiene el precio");
+        long other = createProduct("Otro", "No tiene el precio");
+        long priceId = priceIdOf(addPrice(owner, "10", "2024-01-01", null));
+
+        assertThat(mvc.get().uri("/products/{id}/prices/{priceId}", other, priceId))
+            .hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(deletePrice(other, priceId)).hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void priceCanBeUpdated() throws Exception {
+        long id = createProduct("Actualizable", "Cambia de precio");
+        long priceId = priceIdOf(addPrice(id, "10", "2024-01-01", "2024-06-30"));
+
+        assertThat(updatePrice(id, priceId, """
+            {"value": 15, "initDate": "2024-02-01", "endDate": "2024-07-31"}
+            """)).hasStatusOk().bodyJson().isLenientlyEqualTo("""
+            {"value": 15, "currency": "EUR", "initDate": "2024-02-01", "endDate": "2024-07-31"}
+            """);
+
+        assertThat(priceAt(id, "2024-07-15")).hasStatusOk()
+            .bodyJson().extractingPath("$.value").isEqualTo(15.0);
+        assertThat(priceAt(id, "2024-01-15")).hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void updateKeepingTheSamePeriodIsNotAnOverlap() throws Exception {
+        long id = createProduct("Mismo periodo", "Solo cambia el importe");
+        long priceId = priceIdOf(addPrice(id, "10", "2024-01-01", "2024-06-30"));
+
+        assertThat(updatePrice(id, priceId, """
+            {"value": 12, "initDate": "2024-01-01", "endDate": "2024-06-30"}
+            """)).hasStatusOk();
+    }
+
+    @Test
+    void updateOverlappingAnotherPriceReturns409() throws Exception {
+        long id = createProduct("Solape al actualizar", "Dos precios");
+        addPrice(id, "10", "2024-01-01", "2024-06-30");
+        long secondId = priceIdOf(addPrice(id, "20", "2024-07-01", "2024-12-31"));
+
+        assertThat(updatePrice(id, secondId, """
+            {"value": 20, "initDate": "2024-06-01", "endDate": "2024-12-31"}
+            """)).hasStatus(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void updateWithInvalidDataReturns400() throws Exception {
+        long id = createProduct("Datos invalidos", "Al actualizar");
+        long priceId = priceIdOf(addPrice(id, "10", "2024-01-01", null));
+
+        assertThat(updatePrice(id, priceId, """
+            {"value": 10, "initDate": "2024-06-30", "endDate": "2024-01-01"}
+            """)).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(updatePrice(id, priceId, """
+            {"value": -5, "initDate": "2024-01-01", "endDate": null}
+            """)).hasStatus(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void updateUnknownPriceReturns404() throws Exception {
+        long id = createProduct("Sin ese precio", "Id inexistente");
+
+        assertThat(updatePrice(id, 999_999L, """
+            {"value": 10, "initDate": "2024-01-01", "endDate": null}
+            """)).hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void deletedPriceFreesItsPeriod() throws Exception {
+        long id = createProduct("Borrable", "Libera su periodo");
+        long priceId = priceIdOf(addPrice(id, "10", "2024-01-01", "2024-06-30"));
+
+        assertThat(deletePrice(id, priceId)).hasStatus(HttpStatus.NO_CONTENT);
+        assertThat(mvc.get().uri("/products/{id}/prices/{priceId}", id, priceId))
+            .hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(addPrice(id, "11", "2024-03-01", "2024-08-31")).hasStatus(HttpStatus.CREATED);
+    }
+
+    @Test
+    void deleteUnknownPriceReturns404() throws Exception {
+        long id = createProduct("Nada que borrar", "Id inexistente");
+
+        assertThat(deletePrice(id, 999_999L)).hasStatus(HttpStatus.NOT_FOUND);
     }
 }

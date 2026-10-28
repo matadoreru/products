@@ -82,6 +82,44 @@ public class PriceService {
         return new ProductPriceHistory(product, result.getContent(), PageInfo.from(result));
     }
 
+    @Transactional(readOnly = true)
+    public Price getPrice(Long productId, Long priceId) {
+        return priceRepository.findByIdAndProductId(priceId, productId)
+            .orElseThrow(() -> {
+                productService.get(productId);
+                return new PriceNotFoundException(productId, priceId);
+            });
+    }
+
+    @Transactional
+    public Price updatePrice(Long productId, Long priceId, BigDecimal value, Currency currency,
+                             LocalDate initDate, @Nullable LocalDate endDate) {
+        productService.getForUpdate(productId);
+        Price price = priceRepository.findByIdAndProductId(priceId, productId)
+            .orElseThrow(() -> new PriceNotFoundException(productId, priceId));
+
+        boolean overlaps = priceRepository.findByProductIdAndCurrency(productId, currency).stream()
+            .filter(existingPrice -> !existingPrice.getId().equals(priceId))
+            .anyMatch(existingPrice -> existingPrice.overlaps(initDate, endDate));
+
+        if (overlaps) {
+            throw new PriceOverlapException(productId, currency, initDate, endDate);
+        }
+
+        price.update(value, initDate, endDate, currency);
+
+        try {
+            return priceRepository.saveAndFlush(price);
+        } catch (DataIntegrityViolationException e) {
+            throw new PriceOverlapException(productId, currency, initDate, endDate);
+        }
+    }
+
+    @Transactional
+    public void deletePrice(Long productId, Long priceId) {
+        priceRepository.delete(getPrice(productId, priceId));
+    }
+
     private static Specification<Price> buildFilter(Long productId, PriceHistoryQuery query) {
         List<Specification<Price>> conditions = new ArrayList<>();
         conditions.add(PriceSpecifications.ofProduct(productId));

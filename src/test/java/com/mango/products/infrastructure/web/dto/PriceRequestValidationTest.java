@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class CreatePriceRequestValidationTest {
+class PriceRequestValidationTest {
 
     private static final LocalDate INIT = LocalDate.parse("2024-01-01");
     private static final LocalDate END = LocalDate.parse("2024-06-30");
@@ -36,15 +36,15 @@ class CreatePriceRequestValidationTest {
         factory.close();
     }
 
-    private static Set<String> invalidFields(CreatePriceRequest request) {
-        Set<ConstraintViolation<CreatePriceRequest>> violations = validator.validate(request);
+    private static Set<String> invalidFields(PriceRequest request) {
+        Set<ConstraintViolation<PriceRequest>> violations = validator.validate(request);
         return violations.stream()
             .map(violation -> violation.getPropertyPath().toString())
             .collect(Collectors.toSet());
     }
 
-    private static CreatePriceRequest withValue(String value) {
-        return new CreatePriceRequest(new BigDecimal(value), INIT, END, null);
+    private static PriceRequest withValue(String value) {
+        return new PriceRequest(new BigDecimal(value), INIT, END, null);
     }
 
     @Test
@@ -56,7 +56,7 @@ class CreatePriceRequestValidationTest {
 
     @Test
     void valueCannotBeNull() {
-        assertThat(invalidFields(new CreatePriceRequest(null, INIT, END, null))).containsExactly("value");
+        assertThat(invalidFields(new PriceRequest(null, INIT, END, null))).containsExactly("value");
     }
 
     @ParameterizedTest
@@ -95,35 +95,35 @@ class CreatePriceRequestValidationTest {
 
     @Test
     void initDateCannotBeNull() {
-        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), null, END, null))).containsExactly("initDate");
+        assertThat(invalidFields(new PriceRequest(new BigDecimal("10"), null, END, null))).containsExactly("initDate");
     }
 
     @Test
     void endDateCanBeNull() {
-        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), INIT, null, null))).isEmpty();
+        assertThat(invalidFields(new PriceRequest(new BigDecimal("10"), INIT, null, null))).isEmpty();
     }
 
     @Test
     void severalErrorsAreReportedTogether() {
-        assertThat(invalidFields(new CreatePriceRequest(null, null, null, null)))
+        assertThat(invalidFields(new PriceRequest(null, null, null, null)))
             .containsExactlyInAnyOrder("value", "initDate");
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"EUR", "USD", "GBP", "JPY"})
     void validCurrencyCodesAreAccepted(String currency) {
-        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), INIT, END, currency))).isEmpty();
+        assertThat(invalidFields(new PriceRequest(new BigDecimal("10"), INIT, END, currency))).isEmpty();
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"eur", "ABC", "EURO", "E", ""})
     void invalidCurrencyCodesAreRejected(String currency) {
-        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), INIT, END, currency)))
+        assertThat(invalidFields(new PriceRequest(new BigDecimal("10"), INIT, END, currency)))
             .containsExactly("currency");
     }
 
     @Test
     void currencyCanBeNull() {
-        assertThat(invalidFields(new CreatePriceRequest(new BigDecimal("10"), INIT, END, null))).isEmpty();
+        assertThat(invalidFields(new PriceRequest(new BigDecimal("10"), INIT, END, null))).isEmpty();
     }
 }

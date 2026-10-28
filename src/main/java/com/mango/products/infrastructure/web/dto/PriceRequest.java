@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public record CreatePriceRequest(
+public record PriceRequest(
     @NotNull @Positive @Digits(integer = 10, fraction = 2) BigDecimal value,
     @NotNull LocalDate initDate,
     @Nullable LocalDate endDate,
